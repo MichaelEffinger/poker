@@ -1,141 +1,156 @@
 module standard_evaluator;
+import card;
+import evaluator;
 
 class StandardEvaluator : Evaluator{
 
+  override int opCall(const Card[] board, const Card[] hole_cards) {
 
+    const(Card)[] full = board ~ hole_cards;
+    int[15] rankCounts;
+    int[4] suitCounts;
+    uint rankBits = 0;
+    uint[4] suitBits;
 
-    int opCall(const Card[] board, const Card[] hole_cards){
+    foreach (card; full) {
+        rankCounts[card.rank]++;
+        suitCounts[card.suit]++;
+        rankBits |= 1u << card.rank;
+        suitBits[card.suit] |= 1u << card.rank;
+    }
 
-        Card[] full_hand = board ~ hole_cards;
-
-        //containers of suit counts;
-        int[4] suits;
-        //container of rank counts;
-        int[13] ranks;
-        int max_count;
-        int second_max_count;
-        int straighter;
-        bool can_flush = 0;
-        int value = 0x000000;
-
-
-        //build list of values;
-        foreach(card; full_hand){
-            straighter |= 1 << c.rank;
-            suits[card.suit]++;
-            ranks[card.rank]++;
-        }    
-
-        //check straight flush
-        foreach (s; 0 .. 4) {
-            if (suits[s] < 5) {
-                continue;
-            }
-            can_flush = 1;
+    // Straight flush
+    foreach (s; 0 .. 4) {
+        if (suitCounts[s] >= 5) {
             uint bits = suitBits[s];
 
             for (int high = 14; high >= 5; high--) {
-                uint mask = 0b11111 << (high - 4);
-                if ((bits & mask) == mask){
-                    return (0x700000 + highCard * 0x1000);
-                }
+                uint mask = 0b11111u << (high - 4);
+                if ((bits & mask) == mask)
+                    return 0x800000 + (high << 12);
             }
 
             // wheel
-            if ((bits & (1 << 14)) && (bits & 0b111100) == 0b111100){
-                return (0x700000 + 5* 0x1000);
+            if ((bits & (1 << 14)) &&(bits & 0b11110) == 0b11110){
+                return 0x800000 + (5 << 12);
             }
         }
-
-
-        //check for 4 of a kind
-        for(int i =14; i >= 2; i--){
-            if(ranks[i] == 4){
-                value = 0x600000 + i * 0x10000;
-                int quad_rank = i;
-                for (int j = 14; j >= 2; j--) {
-                    if (j != quad_rank && ranks[j] > 0) {
-                        return value + j*0x1000;
-                        break;
-                    }
-                }
-            }
-            else if(ranks[i]>max_count){
-                max_count = ranks[i];
-                max_count_value =1;
-            }
-            else if(ranks[i]>second_max_count){
-                second_max_count = ranks[i];
-                second_max_count_value = 1;
-            }
-        }
-
-        //check for full house
-        if(max_count >= 3 && second_max_count >=2){
-            return 0x600000 + 0x010000*max_count_value + 0x001000*second_max_count_value;
-        }
-
-
-        //check for flush
-
-        if(can_flush){
-            value += 0x500000;
-            int count = 0;
-            for (int i = 14; i >= 2 && count < 5; i--) {
-                if (ranks[i] > 0 && suitHasFlush[i]) {
-                    value += i * pow16(4 - count); 
-                    count++;
-                }
-            }
-        }
-
-
-        //check for straight
-        for (int high = 14; high >= 5; high--) {
-            uint mask = 0b11111 << (high - 4);
-            if ((bits & mask) == mask){
-                return (0x400000 + highCard * 0x1000);
-            }
-        }
-
-        // wheel
-        if ((bits & (1 << 14)) && (bits & 0b111100) == 0b111100){
-            return (0x400000 + 5* 0x1000);
-        }
-
-    
-        //check for three of kind
-        if(max_count >=3){
-            value += (0x300000 + max_count_value* 0x10000);
-            for (int i = 14; i >= 2 && count < 5; i--) {
-                if (ranks[i] != 3 && ranks[i]!= 0) {
-                    value += i * pow16(2 - count); 
-                    count++;
-                }
-            }
-
-        }
-        
-        //check for 2 pair
-        if(max_count >=2 && second_max_count >=2){
-            value +=(0x200000 + max_count_value * 0x10000 + second_max_count_value * 0x1000);
-            for(int i =14; i>=2; i--){
-                if(i != max_count_value && i != second_max_count_value){
-                    return value += i *0x100;
-                }
-            }
-
-        }
-        
-
-        // check for pair
-
-        //return high card;
-
-
-
-
     }
+
+    // evaluate types of pairs
+    int quad = 0;
+    int trip1 = 0;
+    int trip2 = 0;
+    int pair1 = 0;
+    int pair2 = 0;
+
+    for (int i = 14; i >= 2; i--) {
+        const c = rankCounts[i];
+        if (c == 4) quad = i;
+        else if (c == 3) {
+            if (!trip1) trip1 = i;
+            else trip2 = i;
+        }
+        else if (c == 2) {
+            if (!pair1) pair1 = i;
+            else pair2 = i;
+        }
+    }
+
+    // quads
+    if (quad) {
+        for (int i = 14; i >= 2; i--)
+            if (i != quad && rankCounts[i] > 0)
+                return 0x700000 + (quad << 16) + (i << 12);
+    }
+
+    // full houe!! my favorite hand
+    if (trip1 && (trip2 || pair1)) {
+        int pairRank = trip2 ? trip2 : pair1;
+        return 0x600000 + (trip1 << 16) + (pairRank << 12);
+    }
+
+    // flush
+    foreach (s; 0 .. 4) {
+        if (suitCounts[s] >= 5) {
+            int value = 0x500000;
+            int count = 0;
+
+            for (int i = 14; i >= 2 && count < 5; i--) {
+                if (suitBits[s] & (1 << i)) {
+                    value |= i << (12 - count * 4);
+                    count++;
+                }
+            }
+            return value;
+        }
+    }
+
+    //straight
+    for (int high = 14; high >= 5; high--) {
+        uint mask = 0b11111u << (high - 4);
+        if ((rankBits & mask) == mask)
+            return 0x400000 + (high << 12);
+    }
+
+    // wheel
+    if ((rankBits & (1 << 14)) && (rankBits & 0b11110) == 0b11110){
+        return 0x400000 + (5 << 12);
+    }
+
+
+    // sets and trips
+    if (trip1) {
+        int value = 0x300000 + (trip1 << 16);
+        int count = 0;
+
+        for (int i = 14; i >= 2 && count < 2; i--) {
+            if (i != trip1 && rankCounts[i] > 0) {
+                value |= i << (12 - count * 4);
+                count++;
+            }
+        }
+        return value;
+    }
+
+    //two pair
+    if (pair1 && pair2) {
+        int value = 0x200000 + (pair1 << 16) + (pair2 << 12);
+        for (int i = 14; i >= 2; i--) {
+            if (i != pair1 && i != pair2 && rankCounts[i] > 0){
+                return value + (i << 8);
+            }
+        }
+    }
+
+    //pair
+    if (pair1) {
+        int value = 0x100000 + (pair1 << 16);
+        int count = 0;
+
+        for (int i = 14; i >= 2 && count < 3; i--) {
+            if (i != pair1 && rankCounts[i] > 0) {
+                value |= i << (12 - count * 4);
+                count++;
+            }
+        }
+        return value;
+    }
+
+    //bummer, you got nothin
+    int value = 0;
+    int count = 0;
+
+    for (int i = 14; i >= 2 && count < 5; i--) {
+        if (rankCounts[i] > 0) {
+            value |= i << (16 - count * 4);
+            count++;
+        }
+    }
+
+    return value;
+    }
+
 
     string[] handTypes = [
     "Straight Flush",
@@ -154,6 +169,4 @@ class StandardEvaluator : Evaluator{
 
 
 }
-
-
 

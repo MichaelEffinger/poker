@@ -2,13 +2,15 @@ module deck;
 
 import std.random;
 import std.exception : enforce;
+import std.algorithm.mutation;
 import card;
+
 
 struct Deck {
 
     Card[] deck;
     string[] suit_names;
-    size_t index;
+    size_t top;
     int rank_count;
     Random rng;
 
@@ -32,18 +34,33 @@ struct Deck {
     }
 
     Card draw_card() {
-        enforce(index < deck.length, "Deck Empty");
-        return deck[index++];
+        enforce(top < deck.length, "Deck Empty");
+        return deck[top++];
     }
 
     void burn_card() {
-        enforce(index < deck.length, "Deck Empty");
-        index++;
+        enforce(top < deck.length, "Deck Empty");
+        top++;
+    }
+
+    void remove(Card card){
+        for(size_t i = top; i < deck.length; i++){
+            if(card.rank == deck[i].rank && card.suit == deck[i].suit){
+                swap(deck[top], deck[i]);
+                top++;
+            }
+        }
+    }
+
+    void remove_cards(Card[] cards){
+        foreach (c; cards){
+            remove(c);
+        }
     }
 
     ref Deck shuffle_deck() {
        randomShuffle(deck,rng);
-        index = 0;  
+        top = 0;  
         return this;
     }
 
@@ -73,5 +90,7 @@ struct Deck {
         }
         return temp_deck;
     }
+
+
 
 }
