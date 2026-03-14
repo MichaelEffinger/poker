@@ -1,15 +1,15 @@
-module player;
+module players.computer_player;
 
 import card;
 import std.math : abs;
-import evaluator;
+import players.player;
+import evaluators.evaluator;
 import deck;
 import hand_util;
 import std.random;
 import std.algorithm.comparison;
 
-class Player
-{
+class ComputerPlayer : Player{
 
 	enum Types
 	{
@@ -37,7 +37,7 @@ class Player
 	}
 
 
-	this(string name_, Types type, float skill_) {
+	this(string name_, Types type, float skill_, long stack_size) {
 		
 		name = name_;
 		skill = skill_;
@@ -50,6 +50,7 @@ class Player
 		boredom = 0.0;
 		suspicion = 0;
 		set_personality(type);
+		stack = stack_size;
 	}
 
 
@@ -184,7 +185,6 @@ class Player
 	float adaptability;
 	float patience;
 	float trappiness;
-	string name;
 	//Difficulty factors
 	float skill;
 	float board_awareness;
@@ -195,12 +195,8 @@ class Player
 	float tilt;
 	float confidence;
 	float boredom;
-	long stack;
-	int position;
 	float suspicion;
 	long sunk_cost;
-	Card[] hole;
-
 
 
 	double calculate_pot_odds(long pot, long toCall){
@@ -262,25 +258,26 @@ class Player
 	}
 
 
-	double calculate_equity(Card[] boardCards, size_t players_in, Evaluator eval, Deck simDeck) {
+	double calculate_equity(Card[] boardCards, size_t players_in, Evaluator eval) {
 		if (sim_count == 0) return 0.0;
 
 		size_t wins = 0;
 		size_t ties = 0;
+		
+		eval.deck.shuffle_deck(); 
+		eval.deck.remove_cards(this.hole);
+		eval.deck.remove_cards(boardCards);
 
-		simDeck.remove_cards(this.hole);
-		simDeck.remove_cards(boardCards);
-
-		const size_t simStartTop = simDeck.top;
+		const size_t simStartTop = eval.deck.top;
 
 		for (size_t i = 0; i < sim_count; i++) {
-			randomShuffle(simDeck.deck[simStartTop .. $], simDeck.rng);
+			randomShuffle(eval.deck.deck[simStartTop .. $], eval.deck.rng);
 			
-			simDeck.top = simStartTop;
+			eval.deck.top = simStartTop;
 
 			Card[] simBoard = boardCards.dup; 
 			while (simBoard.length < 5) {
-				simBoard ~= simDeck.draw_card();
+				simBoard ~= eval.deck.draw_card();
 			}
 
 			long myValue = eval(simBoard, this.hole);
@@ -288,7 +285,7 @@ class Player
 			bool tied = false;
 
 			foreach (_; 1 .. players_in) {
-				Card[2] oppHole = [simDeck.draw_card(), simDeck.draw_card()];
+				Card[2] oppHole = [eval.deck.draw_card(), eval.deck.draw_card()];
 				long oppValue = eval(simBoard, oppHole);
 
 				if (oppValue > myValue) {
@@ -413,19 +410,19 @@ class Player
 		return equity >= clamp(threshold, 0.05, 0.95);
 	}
 
-	long take_turn(Card[] board, long pot, long toCall, size_t players_in, Evaluator eval, Deck shuffled_deck) {
+	override long take_turn(Card[] board, long pot, long toCall, size_t players_in, Evaluator eval) {
 		if (stack <= 0) return 0;
 
 		if (board.length == 0) {
 			int handScore = evaluate_starting_hand(hole);
 			if (!should_play_preflop(handScore, toCall, pot)) {
 				boredom_pressure(); 
-				return 0; 
+				return -1; 
 			}
 		}
 
 		double potOdds = calculate_pot_odds(pot, toCall);
-		double equity = calculate_equity(board, players_in, eval, shuffled_deck);
+		double equity = calculate_equity(board, players_in, eval);
 
 		double perceived_equity = equity + (suspicion * adaptability * 0.2f);
 
@@ -440,7 +437,7 @@ class Player
 				return calculate_raise_size(pot, toCall, equity, potOdds);
 			
 			boredom_pressure();
-			return 0; // fold
+			return -1; // fold
 		}
 
 		if (should_trap(perceived_equity)) {
@@ -458,7 +455,7 @@ class Player
 		if (bluff_decide(board, potOdds, equity))
 			return calculate_raise_size(pot, toCall, equity, potOdds);
 		
-		return 0; // Fold
+		return -1; // Fold
 	}
 
 

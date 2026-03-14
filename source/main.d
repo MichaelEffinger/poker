@@ -3,130 +3,273 @@ module main;
 import std.stdio;
 import std.algorithm;
 import std.array;
-import deck;
-import card;
+import std.conv;
+import std.random;
+import std.string;
 import raylib;
-import player;
 
-alias Types = Player.Types;
+import card;
+import deck;
+import table;
+import pot;
+import players.player;
+import players.computer_player;
+import players.human_player;
+import evaluators.standard_evaluator;
+import variants.texas_hold_em;
+import payouts.standard_payout;
 
-void DrawTextureCentered(Texture2D tex,float x,float y,float scale,float rotation, Color thecolor){
-    Rectangle dest = Rectangle(x, y,tex.width * scale,tex.height * scale);
+import tests.standard_evaluater_tester_52;
+import tests.standard_evaluator_tester_tarot;
+import tests.texas_holdem_variant_tester;
 
-    Vector2 origin = Vector2(tex.width * scale / 2,tex.height * scale / 2);
+alias Types = ComputerPlayer.Types;
 
-    DrawTexturePro(tex,Rectangle(0, 0, tex.width, tex.height),dest,origin,rotation,thecolor);
+struct PlayerTemplate {
+    string name;
+    Types  type;
+    float  skill;
 }
+
+// ─── Card rendering ───────────────────────────────────────────────────────────
+
+Texture2D uncut_card_sheet;
+const int   spriteLength = 167;
+const int   spriteHeight = 220;
+const float renderScale  = 0.4f;
+
+void DrawCardUI(int x, int y, Card c, bool hidden, bool grayed = false) {
+    float drawW = spriteLength * renderScale;
+    float drawH = spriteHeight * renderScale;
+    Color tint  = grayed ? Color(100, 100, 100, 255) : Colors.WHITE;
+    if (hidden) {
+        DrawRectangle(x, y, cast(int)drawW, cast(int)drawH,
+                      grayed ? Colors.DARKGRAY : Colors.DARKBLUE);
+        DrawRectangleLines(x, y, cast(int)drawW, cast(int)drawH, Colors.RAYWHITE);
+        return;
+    }
+    int rankCol = (c.rank == 14) ? 0 : c.rank - 1;
+    int suitRow  = c.suit;
+    Rectangle sourceRec = Rectangle(cast(float)(rankCol * spriteLength),
+                                    cast(float)(suitRow  * spriteHeight),
+                                    cast(float)spriteLength,
+                                    cast(float)spriteHeight);
+    Rectangle destRec   = Rectangle(cast(float)x, cast(float)y, drawW, drawH);
+    DrawTexturePro(uncut_card_sheet, sourceRec, destRec, Vector2(0, 0), 0.0f, tint);
+}
+
+// ─── Layout ───────────────────────────────────────────────────────────────────
+
+const int cx = 1280 / 2;
+const int cy = 800  / 2;
+
+Vector2[] chairPos = [
+    Vector2(cx,       cy + 280),
+    Vector2(cx - 350, cy + 220),
+    Vector2(cx - 500, cy),
+    Vector2(cx - 350, cy - 220),
+    Vector2(cx,       cy - 280),
+    Vector2(cx + 350, cy - 220),
+    Vector2(cx + 500, cy),
+    Vector2(cx + 350, cy + 220),
+    Vector2(cx + 150, cy + 280),
+];
+
+// ─── Draw ─────────────────────────────────────────────────────────────────────
+
+void draw(Table t, float sliderVal, long raiseAmount, string winnerText, bool showdown) {
+    BeginDrawing();
+    ClearBackground(Color(25, 35, 25, 255));
+    DrawEllipse(cx, cy, 550, 300, Color(30, 80, 30, 255));
+
+    if (showdown) {
+        DrawText(toStringz(winnerText),
+                 cx - (MeasureText(toStringz(winnerText), 32) / 2),
+                 cy - 150, 32, Colors.GOLD);
+    } else {
+        string pTxt = "POT: $" ~ t.pot_total().to!string;
+        DrawText(toStringz(pTxt),
+                 cx - (MeasureText(toStringz(pTxt), 24) / 2),
+                 cy - 110, 24, Colors.GOLD);
+    }
+
+    foreach (i, p; t.players) {
+        if (p is null) continue;
+        if (i >= chairPos.length) continue;
+
+        int px = cast(int)chairPos[i].x;
+        int py = cast(int)chairPos[i].y;
+
+        bool folded = p.folded;
+
+        if (t.current_turn == i && !showdown)
+            DrawCircle(px, py, 45, Color(255, 255, 0, 100));
+
+        // dealer button
+        if (t.dealer_index == i)
+            DrawCircle(px + 35, py - 35, 10, Colors.WHITE);
+
+        DrawCircle(px, py, 30, folded ? Colors.DARKGRAY : Colors.MAROON);
+        DrawText(toStringz(p.name),
+                 px - (MeasureText(toStringz(p.name), 18) / 2),
+                 py + 35, 18, folded ? Colors.GRAY : Colors.WHITE);
+        DrawText(toStringz("$" ~ p.stack.to!string), px - 25, py + 55, 16, Colors.LIME);
+
+        if (p.hole.length >= 2) {
+            bool hideAI = (i != 0 && !showdown);
+            DrawCardUI(px - 40, py - 100, p.hole[0], hideAI, folded);
+            DrawCardUI(px + 5,  py - 100, p.hole[1], hideAI, folded);
+        }
+    }
+
+    // board cards
+    foreach (i, c; t.board_cards)
+        DrawCardUI(cast(int)(cx - 180 + (i * 75)), cy - 44, c, false);
+
+    // human controls
+    Player cur = t.players[t.current_turn];
+    if (!showdown && cur !is null && cast(HumanPlayer)cur !is null) {
+        DrawRectangle(400, 710, 400, 10, Colors.GRAY);
+        DrawCircle(400 + cast(int)(sliderVal * 400), 715, 12, Colors.GOLD);
+        DrawText(toStringz("Raise: $" ~ raiseAmount.to!string), 550, 680, 20, Colors.WHITE);
+        DrawText("[C] CALL/CHECK  [F] FOLD  [R] RAISE", cx - 180, 740, 20, Colors.YELLOW);
+    } else if (showdown) {
+        DrawText("PRESS [SPACE] FOR NEXT HAND", cx - 150, 740, 22, Colors.LIME);
+    }
+
+    EndDrawing();
+}
+
+// ─── Main ─────────────────────────────────────────────────────────────────────
 
 int main() {
+    // run tests first
+    standard_evaluator_test_52();
+    standard_evaluator_test_tarot();
+    texas_holdem_tester();
 
-    Player[] players = [
-        new Player("Riley", Types.MANIAC, 0.3),
-        new Player("Ryan", Types.HOTHEAD, 0.6),
-        new Player("Liv", Types.NITPICKER, 0.6),
-        new Player("Hunter", Types.STANDARD, 0.5),
-        new Player("Cole", Types.BULLY, 0.7),
-        new Player("Chris", Types.TILTER, 0.3),
-        new Player("Blake", Types.SHOWBOAT, 0.4),
-        new Player("Johnny", Types.MANIPULATOR, 0.6),
-        new Player("John", Types.CALLER, 0.5),
-        new Player("Elijah", Types.GAMBLER, 0.5),
-        new Player("Parker", Types.RANDOMIZER, 0.3),
-        new Player("Poker God", Types.ABC, 0.9)
+    InitWindow(1280, 800, "D-Poker");
+    SetTargetFPS(60);
+    uncut_card_sheet = LoadTexture("./resources/cardSprites.png");
+
+    // build modules
+    Deck d = Deck.create_standard_52().shuffle_deck();
+    auto eval    = new StandardEvaluator(2, 14, 4, d);
+    auto variant = new TexasHoldEm();
+    auto payouts = new StandardPayout();
+
+    variant.current_blind = 10;
+
+    auto t = new Table(d, eval, variant, payouts);
+
+    // human player
+    auto human  = new HumanPlayer("YOU", 1000);
+    t.players  ~= human;
+
+    // full roster, shuffle and pick 7
+    PlayerTemplate[] roster = [
+        PlayerTemplate("Riley",     Types.MANIAC,      0.9f),
+        PlayerTemplate("Ryan",      Types.HOTHEAD,     0.8f),
+        PlayerTemplate("Liv",       Types.NIT,         0.2f),
+        PlayerTemplate("Hunter",    Types.STANDARD,    0.5f),
+        PlayerTemplate("Cole",      Types.BULLY,       0.8f),
+        PlayerTemplate("Chris",     Types.TILTER,      0.7f),
+        PlayerTemplate("Blake",     Types.SHOWBOAT,    0.6f),
+        PlayerTemplate("Johnny",    Types.MANIPULATOR, 0.5f),
+        PlayerTemplate("John",      Types.CALLER,      0.3f),
+        PlayerTemplate("Elijah",    Types.GAMBLER,     0.9f),
+        PlayerTemplate("Parker",    Types.RANDOMIZER,  0.5f),
+        PlayerTemplate("Poker God", Types.ABC,         1.0f),
     ];
 
+    auto rng = Random(unpredictableSeed);
+    randomShuffle(roster, rng);
 
-    InitWindow(1280,800,"main");
-
-    Texture2D uncut_card_sheet = LoadTexture("./cardSprites.png");
-
-    Texture2D herroGovna = LoadTexture("./govna.jpg");
-    SetWindowOpacity(1);
-
-    Texture2D chair = LoadTexture("./chair.png");
-
-    Texture2D table = LoadTexture("./table.png");
-
-    int spriteLength = 167;
-    int spriteHeight = 220;
-
-    const int screenWidth = 1280;
-    const int screenHeight = 800;
-
-    int cx = screenWidth/2;
-    int cy = screenHeight/2;
-
-
-    Vector2 ballPosition = {cx - 125, cast(int)( cy - 360 + (chair.height * 0.080))};
-
-    SetTargetFPS(60);
-
-    while(!WindowShouldClose()){
-
-
-        if (IsKeyDown(KeyboardKey.KEY_RIGHT)) ballPosition.x += 2.0f;
-        if (IsKeyDown(KeyboardKey.KEY_LEFT)) ballPosition.x -= 2.0f;
-        if (IsKeyDown(KeyboardKey.KEY_UP)) ballPosition.y -= 2.0f;
-        if (IsKeyDown(KeyboardKey.KEY_DOWN)) ballPosition.y += 2.0f;
-
-        
-        BeginDrawing();
-        int suit = 0;
-        int rank = 1;
-        DrawTextureRec(uncut_card_sheet,Rectangle(spriteLength*(rank-1),spriteHeight*(suit-1),spriteLength,spriteHeight),Vector2(0,0), Colors.WHITE);
-
-        ClearBackground(Color(120,120,120));
-
-        DrawTextureCentered(table,cx,cy,1.25,180,Colors.WHITE);
-        // Dealer (bottom center)
-        DrawTextureCentered(chair, cx, cy + 200 + (chair.height*.080), .2, 180, Colors.WHITE);
-        DrawTextureCentered(chair, cx-125, cy - 360 + (chair.height*.080), .2, 0, Colors.WHITE);
-        DrawTextureCentered(chair, cx+125, cy - 360 + (chair.height*.080), .2, 0, Colors.WHITE);
-        // Right side (3)
-        DrawTextureCentered(chair, cx + 375, cy - 205, .2, 45, Colors.WHITE);
-        DrawTextureCentered(chair, cx + 450, cy, .2, 90, Colors.WHITE);
-        DrawTextureCentered(chair, cx + 375, cy + 205, .2, 135, Colors.WHITE);
-
-        // Left side (3)
-        DrawTextureCentered(chair, cx - 375, cy - 205, .2, 315, Colors.WHITE);
-        DrawTextureCentered(chair, cx - 450, cy, .2, 270, Colors.WHITE);
-        DrawTextureCentered(chair, cx - 375, cy + 205, .2, 225, Colors.WHITE);
-
-
-        // Player stick heads (circles) at each chair
-        DrawCircle(cx, cast(int)(cy + 200 + (chair.height * 0.080)), 40, Colors.BLACK);        // Dealer
-        DrawCircle(cast(int)(ballPosition.x), cast(int)(ballPosition.y), 40, Colors.BLUE); // Left top
-        DrawCircle(cx + 125, cast(int)(cy - 360 + (chair.height * 0.080)), 60, Colors.GREEN);// Right top
-
-        // Right side
-        DrawCircle(cx + 375, cy - 205, 40, Colors.ORANGE);
-        DrawCircle(cx + 450, cy, 40, Colors.PURPLE);
-        DrawCircle(cx + 375, cy + 205, 40, Colors.YELLOW);
-
-        // Left side
-        DrawCircle(cx - 375, cy - 205, 40, Colors.RED);
-        DrawCircle(cx - 450, cy, 40, Colors.PINK);
-        DrawCircle(cx - 375, cy + 205, 40, Colors.BROWN);
-
-
-
-        EndDrawing();
+    foreach (r; roster[0 .. 7]) {
+        auto ai  = new ComputerPlayer(r.name, r.type, r.skill, 1000);
+        t.players ~= ai;
     }
 
-    Deck myDeck = Deck.create_standard_52();
+    t.dealer_index = 0;
+    t.current_turn = 0;
 
-    Deck* newdeck = new Deck;
+    // UI state
+    float  sliderVal   = 0.0f;
+    long   raiseAmount = 0;
+    float  aiTimer     = 0.0f;
+    bool   showdown    = false;
+    string winnerText  = "";
 
-    foreach(d; myDeck.deck){
-        writeln(d.rank, " of ", myDeck.suit_names[d.suit]);
+    while (!WindowShouldClose()) {
+
+        // showdown screen — wait for space to start next hand
+        if (showdown) {
+            if (IsKeyPressed(KeyboardKey.KEY_SPACE)) {
+                showdown   = false;
+                winnerText = "";
+                sliderVal  = 0.0f;
+                aiTimer    = 0.0f;
+            }
+            draw(t, sliderVal, raiseAmount, winnerText, showdown);
+            continue;
+        }
+
+        Player cur = t.players[t.current_turn];
+        bool is_human = cur !is null && cast(HumanPlayer)cur !is null;
+
+        // human input
+        if (is_human) {
+            // find current highest bet to calculate toCall
+            long highest = 0;
+            foreach (p; t.players)
+                if (p !is null && p.round_bets > highest)
+                    highest = p.round_bets;
+            long already_bet = cur.round_bets;
+            long to_call     = highest - already_bet;
+            long min_raise   = highest * 2;
+            if (min_raise == 0) min_raise = variant.current_blind * 2;
+
+            // slider
+            if (IsMouseButtonDown(MouseButton.MOUSE_BUTTON_LEFT)) {
+                Vector2 m = GetMousePosition();
+                if (m.y > 700 && m.y < 730 && m.x > 400 && m.x < 800)
+                    sliderVal = (m.x - 400) / 400.0f;
+            }
+            raiseAmount = min_raise + cast(long)(sliderVal * (cur.stack - min_raise));
+            if (raiseAmount > cur.stack) raiseAmount = cur.stack;
+            if (raiseAmount < min_raise) raiseAmount = min_raise;
+
+            auto hp = cast(HumanPlayer)cur;
+            if (IsKeyPressed(KeyboardKey.KEY_C)) hp.submit_decision(to_call);
+            if (IsKeyPressed(KeyboardKey.KEY_F)) hp.submit_decision(-1);
+            if (IsKeyPressed(KeyboardKey.KEY_R)) hp.submit_decision(raiseAmount);
+        }
+
+        // AI delay
+        aiTimer += GetFrameTime();
+        bool ai_ready = !is_human && aiTimer > 0.8f;
+
+        if (is_human || ai_ready) {
+            int signal = t.update();
+            writeln("signal: ", signal, " turn: ", t.current_turn);
+            if (ai_ready) aiTimer = 0.0f;
+
+            if (signal == variant.Signal.SHOWDOWN || t.current_round > 3) {
+                winnerText = "";
+                foreach (pot; t.pots) {
+                    foreach (w; pot.winners) {
+                        if (winnerText.length > 0) winnerText ~= ", ";
+                        winnerText ~= w.name ~ " WINS $" ~ pot.amount.to!string;
+                    }
+                }
+                if (winnerText == "") winnerText = "No winners found";
+                showdown = true;
+            }
+        }
+        draw(t, sliderVal, raiseAmount, winnerText, showdown);
     }
-     myDeck.shuffle_deck();
-    foreach(d; myDeck.deck){
-        writeln(d.rank, " of ", myDeck.suit_names[d.suit]);
-    }
+
+    UnloadTexture(uncut_card_sheet);
+    CloseWindow();
     return 0;
 }
-
-
-
-

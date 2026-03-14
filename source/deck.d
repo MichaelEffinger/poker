@@ -48,6 +48,7 @@ struct Deck {
             if(card.rank == deck[i].rank && card.suit == deck[i].suit){
                 swap(deck[top], deck[i]);
                 top++;
+                break;
             }
         }
     }
