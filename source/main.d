@@ -154,7 +154,7 @@ int main() {
 
     // build modules
     Deck d = Deck.create_standard_52().shuffle_deck();
-    auto eval    = new StandardEvaluator(2, 14, 4, d);
+    auto eval    = new StandardEvaluator(2, 14, 4);
     auto variant = new TexasHoldEm();
     auto payouts = new StandardPayout();
 
@@ -251,7 +251,6 @@ int main() {
 
         if (is_human || ai_ready) {
             int signal = t.update();
-            writeln("signal: ", signal, " turn: ", t.current_turn);
             if (ai_ready) aiTimer = 0.0f;
 
             if (signal == variant.Signal.SHOWDOWN || t.current_round > 3) {

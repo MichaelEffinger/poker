@@ -6,7 +6,6 @@ import evaluators.evaluator;
 import players.player;
 import variants.poker_variant;
 import payouts.payout_structure;
-import players.human_player;
 
 class Table{
     Player[] players; 
@@ -87,19 +86,15 @@ class Table{
 
     int update(){
         if(players.length <=0){
-            return -1; // tell the game to add more players or something
+            return -1; 
         }
 
         int signal = variant.advance(players, deck, board_cards, pot_total(), current_round,current_turn, evaluator);
-        
 
         switch(signal){
+            case variant.Signal.WAITING:
+                break;
             case variant.Signal.CONTINUE:
-                Player cur = players[current_turn];
-                if(cur !is null && cast(HumanPlayer)cur !is null) {
-                    auto hp = cast(HumanPlayer)cur;
-                    if(hp.is_waiting()) break; // don't advance, stay on human
-                }
                 current_turn = next_turn(current_turn);
                 break;
             case variant.Signal.ROUND_END:

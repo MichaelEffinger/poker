@@ -4,6 +4,7 @@ import players.player;
 import deck;
 import evaluators.evaluator;
 import card;
+import std.stdio;
 
 
 class HumanPlayer : Player{
@@ -24,6 +25,7 @@ class HumanPlayer : Player{
     private bool turn_active = false;
 
     override long take_turn(Card[] board, long pot, long toCall,size_t players_in, Evaluator eval){
+        writeln("take_turn called, turn_active: ", turn_active, " decision_ready: ", decision_ready);
         if (!turn_active){
             turn_active = true;
             decision_ready = false;
@@ -39,6 +41,7 @@ class HumanPlayer : Player{
     }
 
     void submit_decision(long value){
+         writeln("submit_decision called with: ", value);
         decision_value = value;
         decision_ready = true;
     }
