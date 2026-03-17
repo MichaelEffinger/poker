@@ -1,1 +1,25 @@
-{"libs" : ["raylib"], "lflags-posix" : ["-L."], "lflags-osx" : ["-rpath", "@executable_path/"], "lflags-linux" : ["-rpath=$$ORIGIN"], "description" : "A minimal D application.", "name" : "poker", "dependencies" : {"raylib-d" : "~>5.5.3"}, "authors" : ["Michael"], "copyright" : "Copyright © 2026, Michael", "license" : "proprietary"}
+{
+	"authors": [
+		"Michael"
+	],
+	"lflags-linux": [
+		"-rpath=$$ORIGIN"
+	],
+	"license": "proprietary",
+	"copyright": "Copyright © 2026, Michael",
+	"name": "poker",
+	"libs": [
+		"raylib"
+	],
+	"lflags-posix": [
+		"-L."
+	],
+	"description": "A minimal D application.",
+	"dependencies": {
+		"raylib-d": "~>5.5.3"
+	},
+	"lflags-osx": [
+		"-rpath",
+		"@executable_path/"
+	]
+}
