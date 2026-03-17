@@ -1,5 +1,8 @@
 cmake_minimum_required(VERSION 3.15)
 
-project(MyPokerGame)  # Just a project name
+project(poker)
 
-add_executable(MyPokerGame main.d)  # Build main.cpp as the executable
+add_custom_target(poker
+        COMMAND dub build --dest ${CMAKE_BINARY_DIR} --build=debug
+        WORKING_DIRECTORY ${CMAKE_SOURCE_DIR}
+)
