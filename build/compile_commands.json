@@ -1,8 +1,0 @@
-[
-{
-  "directory": "/home/Michael/poker/build",
-  "command": "/usr/bin/clang++ -g -o CMakeFiles/MyPokerGame.dir/main.cpp.o -c /home/Michael/poker/main.cpp",
-  "file": "/home/Michael/poker/main.cpp",
-  "output": "/home/Michael/poker/build/CMakeFiles/MyPokerGame.dir/main.cpp.o"
-}
-]

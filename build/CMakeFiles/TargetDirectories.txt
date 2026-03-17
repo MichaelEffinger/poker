@@ -1,3 +1,0 @@
-/home/Michael/poker/build/CMakeFiles/MyPokerGame.dir
-/home/Michael/poker/build/CMakeFiles/edit_cache.dir
-/home/Michael/poker/build/CMakeFiles/rebuild_cache.dir
