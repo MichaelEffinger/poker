@@ -58,7 +58,7 @@ class StubPlayer : Player {
 
 class StubVariant : PokerVariant {
     int next_signal = Signal.CONTINUE;
-    override int advance(Player[] players, Deck deck, ref Card[] board,
+    override int advance(Player[] players, ref Deck deck, ref Card[] board,
                          long pot, size_t current_round, ref size_t current_turn,
                          Evaluator eval) {
         return next_signal;
@@ -818,7 +818,7 @@ void test_clean_bankrupt_keeps_one_chip() {
 class SequenceVariant : PokerVariant {
     int[] sequence;
     size_t index = 0;
-    override int advance(Player[] players, Deck deck, ref Card[] board,
+    override int advance(Player[] players, ref Deck deck, ref Card[] board,
                          long pot, size_t current_round, ref size_t current_turn,
                          Evaluator eval) {
         if (index >= sequence.length) return Signal.HAND_END;

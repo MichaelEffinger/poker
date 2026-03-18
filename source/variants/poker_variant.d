@@ -6,6 +6,8 @@ import deck;
 import card;
 import evaluators.evaluator;
 
+import std.stdio;
+
 abstract class PokerVariant{
 
     enum Signal {
@@ -18,7 +20,7 @@ abstract class PokerVariant{
     }
     
     bool needs_setup = true;
-    int advance(Player[] players, Deck deck, ref Card[] board, long pot, size_t current_round, ref size_t current_turn, Evaluator eval);
+    int advance(Player[] players, ref Deck deck, ref Card[] board, long pot, size_t current_round, ref size_t current_turn, Evaluator eval);
 
     long current_highest_bet(Player[] players) {
         long highest = 0;
@@ -56,9 +58,9 @@ abstract class PokerVariant{
         if(result == -1){
             in_action.folded = true;
         }
-        else if(result >= highest){
+        else if(result > highest){
             foreach(i,other;players){
-                if(other !is null && other != in_action && !other.folded){
+                if(other !is null && other !is in_action && !other.folded){
                     other.matched = false;
                 }
             }

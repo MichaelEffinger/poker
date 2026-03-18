@@ -19,6 +19,13 @@ abstract class Player
     long round_bets;
 
 
+    bool opEquals(Player lhs)const {
+        if(this.name == lhs.name || this.stack == lhs.stack){
+            return true;
+        }
+        return false;
+    }
+
 
     abstract long take_turn(Card[] board, long pot, long toCall, size_t players_in, Evaluator eval);
 

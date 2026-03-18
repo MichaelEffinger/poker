@@ -176,6 +176,14 @@ class Table{
                     players[i].round_bets -= lowest; 
                 }
             }
+
+            if(pots.length == 0){
+                this.pots ~=newPot;
+            }
+            else if(this.pots[$-1].eligible == newPot.eligible){
+                this.pots[$-1].amount += newPot.amount;
+                return;
+            }
             this.pots ~= newPot; 
         }
     }

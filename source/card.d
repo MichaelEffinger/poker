@@ -6,7 +6,7 @@ public:
     int suit;
     int rank;
 
-    this( int suit_, int rank_){
+    this(int suit_, int rank_){
         suit = suit_;
         rank = rank_;
     }

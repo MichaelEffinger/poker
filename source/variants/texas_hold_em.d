@@ -17,7 +17,7 @@ class TexasHoldEm : PokerVariant{
     long current_blind;
 
 
-    void deal_cards(Player[] players, Deck deck){
+    void deal_cards(Player[] players, ref Deck deck){
         deck.burn_card();
         for(int i = 0; i < 2; i++){
             for(size_t j = 0; j < players.length; j++){
@@ -28,19 +28,19 @@ class TexasHoldEm : PokerVariant{
         }
     }
 
-    void deal_flop(ref Card[] board, Deck deck){
+    void deal_flop(ref Card[] board, ref Deck deck){
         deck.burn_card();
         board ~= deck.draw_card();
         board ~= deck.draw_card();
         board ~= deck.draw_card();
     }
 
-    void deal_turn(ref Card[] board, Deck deck){
+    void deal_turn(ref Card[] board, ref Deck deck){
         deck.burn_card();
         board ~= deck.draw_card();
     }
 
-    void deal_river(ref Card[] board, Deck deck){
+    void deal_river(ref Card[] board, ref Deck deck){
         deck.burn_card();
         board ~= deck.draw_card();
     }
@@ -79,7 +79,7 @@ class TexasHoldEm : PokerVariant{
         return true;
     }
 
-    override int advance(Player[] players, Deck deck, ref Card[] board, long pot, size_t current_round, ref size_t current_turn, Evaluator eval){
+    override int advance(Player[] players, ref Deck deck, ref Card[] board, long pot, size_t current_round, ref size_t current_turn, Evaluator eval){
 
 
         size_t active = 0;
