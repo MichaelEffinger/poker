@@ -22,8 +22,25 @@ import payouts.standard_payout;
 import tests.standard_evaluater_tester_52;
 import tests.standard_evaluator_tester_tarot;
 import tests.texas_holdem_variant_tester;
+import tests.table_tester;
+import tests.computer_player_tester;
 
 alias Types = ComputerPlayer.Types;
+
+
+/*
+
+int main(){
+    table_tester();
+    texas_holdem_tester();
+    standard_evaluator_test_52();
+    standard_evaluator_test_tarot();
+    computer_player_test();
+    return 0;
+
+
+}
+*/ 
 
 struct PlayerTemplate {
     string name;
@@ -154,7 +171,7 @@ int main() {
 
     // build modules
     Deck d = Deck.create_standard_52().shuffle_deck();
-    auto eval    = new StandardEvaluator(2, 14, 4);
+    auto eval    = new StandardEvaluator(2, 14, 4, d);
     auto variant = new TexasHoldEm();
     auto payouts = new StandardPayout();
 
@@ -226,10 +243,12 @@ int main() {
                     highest = p.round_bets;
             long already_bet = cur.round_bets;
             long to_call     = highest - already_bet;
-            long min_raise   = highest * 2;
+            long min_raise = highest * 2;
             if (min_raise == 0) min_raise = variant.current_blind * 2;
 
-            // slider
+            // Cap min_raise to current stack
+            if (min_raise > cur.stack) min_raise = cur.stack;
+
             if (IsMouseButtonDown(MouseButton.MOUSE_BUTTON_LEFT)) {
                 Vector2 m = GetMousePosition();
                 if (m.y > 700 && m.y < 730 && m.x > 400 && m.x < 800)
