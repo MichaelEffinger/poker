@@ -13,6 +13,7 @@ abstract class PokerVariant{
     ROUND_END=1,
     SHOWDOWN=2,
     HAND_END=3, 
+    FOLD_WIN=4,
     WAITING = -69
     }
     
@@ -64,6 +65,7 @@ abstract class PokerVariant{
             in_action.stack -= result;
             in_action.round_bets += result;
             in_action.matched = true;
+            if(in_action.stack <= 0) in_action.all_in = true;
         }
         else{
             in_action.stack -= result;

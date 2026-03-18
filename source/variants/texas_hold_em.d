@@ -81,6 +81,23 @@ class TexasHoldEm : PokerVariant{
 
     override int advance(Player[] players, Deck deck, ref Card[] board, long pot, size_t current_round, ref size_t current_turn, Evaluator eval){
 
+
+        size_t active = 0;
+        Player last_active;
+        foreach(p; players){
+            if (p !is null && !p.folded){
+                active++;
+                last_active = p;
+            }
+        }
+        if (active == 1){
+            needs_setup = true;
+            return Signal.FOLD_WIN;
+
+        }
+
+
+
         switch(current_round){
             case 0:
                 if(needs_setup){
