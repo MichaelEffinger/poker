@@ -60,7 +60,7 @@ struct Deck {
     }
 
     ref Deck shuffle_deck() {
-       randomShuffle(deck,rng);
+       deck = randomShuffle(deck,rng);
         top = 0;  
         return this;
     }

@@ -8,6 +8,7 @@ import deck;
 import hand_util;
 import std.random;
 import std.algorithm.comparison;
+import std.stdio;
 
 class ComputerPlayer : Player{
 
@@ -271,7 +272,7 @@ class ComputerPlayer : Player{
 		const size_t simStartTop = eval.deck.top;
 
 		for (size_t i = 0; i < sim_count; i++) {
-			randomShuffle(eval.deck.deck[simStartTop .. $], eval.deck.rng);
+			eval.deck.shuffle_deck();
 			
 			eval.deck.top = simStartTop;
 
@@ -301,7 +302,8 @@ class ComputerPlayer : Player{
 				else wins++;
 			}
 		}
-
+		
+		writeln("player ",name," made a decision ", ((wins + (ties * 0.5)) / cast(double)sim_count), " equity");
 		return (wins + (ties * 0.5)) / cast(double)sim_count;
 	}
 	
@@ -420,6 +422,7 @@ class ComputerPlayer : Player{
 				return -1; 
 			}
 		}
+
 
 		double potOdds = calculate_pot_odds(pot, toCall);
 		double equity = calculate_equity(board, players_in, eval);

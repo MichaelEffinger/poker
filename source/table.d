@@ -22,16 +22,18 @@ class Table{
     PayoutStructure payouts;
 
 
-
     long pot_total(){
-        long accumulater;
-        if (pots.length ==0){
-            return 0;
-        }
+        long accumulator = 0;
         foreach(pot; pots){
-            accumulater += pot.amount;
-        }  
-        return accumulater;
+            accumulator += pot.amount;
+        }
+        // also count bets not yet swept into a pot
+        foreach(p; players){
+            if(p !is null){
+                accumulator += p.round_bets;
+            }
+        }
+        return accumulator;
     }
 
     //Alimony, Nit   // change payout
@@ -104,13 +106,22 @@ class Table{
                 current_turn = next_turn(dealer_index);
                 break;
             case variant.Signal.SHOWDOWN:
+                create_pots();
                 find_and_set_winners();
                 payouts.distribute(pots);
+                current_round++;
                 break;
             case variant.Signal.HAND_END:
                 hand_end();
                 clean_bankrupt();
-                dealer_index = next_turn(dealer_index);
+                current_round=0;
+                break;
+            case variant.Signal.FOLD_WIN:
+                create_pots();
+                find_fold_winner();
+                payouts.distribute(pots);
+                hand_end();
+                clean_bankrupt();
                 break;
             default:
                 break;
@@ -126,7 +137,7 @@ class Table{
         int contributer_count = 0;
 
         for(size_t i = 0; i < players.length; i++){
-            if(players[i].round_bets > 0){
+            if(players[i] !is null && players[i].round_bets > 0){
                 contributers ~= true;
                 contributer_count++; 
             }
@@ -144,7 +155,7 @@ class Table{
             }
 
             foreach(i, cont; contributers){
-                if(cont && !players[i].folded){ 
+                if(cont && players[i] !is null && !players[i].folded){ 
                     newPot.eligible ~= players[i];
                 }
             }
@@ -152,7 +163,7 @@ class Table{
             newPot.amount = 0;
 
             for(size_t i = 0; i < players.length; i++){
-                if(players[i].round_bets == 0) continue;
+                if(players[i] is null || players[i].round_bets == 0) continue;
 
                 if(players[i].round_bets <= lowest){
                     newPot.amount += players[i].round_bets;
@@ -215,6 +226,20 @@ class Table{
             if(players[i].stack <= 0){
                 players[i] = null;
             }
+        }
+    }
+
+    void find_fold_winner() {
+        Player winner;
+        foreach(p; players) {
+            if(p !is null && !p.folded) {
+                winner = p;
+                break;
+            }
+        }
+        foreach(ref pot; pots) {
+            pot.winners.length = 0;
+            pot.winners ~= winner;
         }
     }
 
